@@ -13,8 +13,11 @@ public class GameManager : MonoBehaviour
         PVE  // 플레이어 vs AI (전체 화면)
     }
 
+    // [추가됨] 메인 메뉴에서 선택한 모드를 저장하는 전역 변수 (씬이 바껴도 유지됨)
+    public static GameMode SelectMode = GameMode.PVP;
+
     [Header("Game Mode Settings")]
-    public GameMode gameMode = GameMode.PVP; // 기본값 PVP
+    public GameMode gameMode = GameMode.PVP; // 현재 게임의 모드
 
     [Header("Player Settings")]
     public Transform player1; // 플레이어 1 오브젝트
@@ -70,6 +73,9 @@ public class GameManager : MonoBehaviour
     // 게임 초기화
     void InitializeGame()
     {
+        // [중요 수정] 메인 메뉴에서 선택했던 모드를 현재 게임 모드로 적용
+        gameMode = SelectMode;
+
         p1Timer = maxTime;
         p2Timer = maxTime;
         isGameEnded = false;
