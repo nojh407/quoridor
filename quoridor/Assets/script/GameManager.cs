@@ -6,8 +6,15 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance; // 싱글톤 패턴
 
+    // 게임 모드 정의
+    public enum GameMode
+    {
+        PVP, // 플레이어 vs 플레이어 (화면 분할)
+        PVE  // 플레이어 vs AI (전체 화면)
+    }
+
     [Header("Game Mode Settings")]
-    public bool isPvpMode = true; // PVP 모드 여부 (기본값 true)
+    public GameMode gameMode = GameMode.PVP; // 기본값 PVP
 
     [Header("Player Settings")]
     public Transform player1; // 플레이어 1 오브젝트
@@ -74,39 +81,38 @@ public class GameManager : MonoBehaviour
         // 화면 분할 설정 적용
         SetupCameras();
 
-        Debug.Log("Game Started! Mode: " + (isPvpMode ? "PVP" : "AI"));
+        Debug.Log($"Game Started! Mode: {gameMode}");
 
-        // 오류가 났던 부분 해결: 아래에 UpdateMessage 함수가 정의되어 있어 정상 작동합니다.
         UpdateMessage("Player 1의 차례입니다.");
     }
 
-    // 화면 분할 로직 (PVP: 분할, AI: 전체화면)
+    // 화면 분할 로직 (PVE: 전체화면, PVP: 분할)
     void SetupCameras()
     {
-        if (isPvpMode)
+        switch (gameMode)
         {
-            if (cameraP1 != null && cameraP2 != null)
-            {
-                // Player 1: 왼쪽 화면 (0 ~ 0.5)
-                cameraP1.rect = new Rect(0f, 0f, 0.5f, 1f);
+            case GameMode.PVE: // 1인 전체 화면 (AI 모드)
+                if (cameraP1 != null)
+                {
+                    cameraP1.rect = new Rect(0f, 0f, 1f, 1f); // 전체 화면
+                }
+                if (cameraP2 != null)
+                {
+                    cameraP2.gameObject.SetActive(false); // P2 카메라 끄기
+                }
+                break;
 
-                // Player 2: 오른쪽 화면 (0.5 ~ 1.0)
-                cameraP2.rect = new Rect(0.5f, 0f, 0.5f, 1f);
-
-                cameraP2.gameObject.SetActive(true);
-            }
-        }
-        else
-        {
-            // AI 모드 등에서는 P1 카메라만 전체 화면 사용
-            if (cameraP1 != null)
-            {
-                cameraP1.rect = new Rect(0f, 0f, 1f, 1f);
-            }
-            if (cameraP2 != null)
-            {
-                cameraP2.gameObject.SetActive(false);
-            }
+            case GameMode.PVP: // 2인 화면 분할
+                if (cameraP1 != null)
+                {
+                    cameraP1.rect = new Rect(0f, 0f, 0.5f, 1f); // 왼쪽 절반
+                }
+                if (cameraP2 != null)
+                {
+                    cameraP2.gameObject.SetActive(true); // P2 카메라 켜기
+                    cameraP2.rect = new Rect(0.5f, 0f, 0.5f, 1f); // 오른쪽 절반
+                }
+                break;
         }
     }
 
@@ -132,7 +138,6 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        // 오류가 났던 부분 해결: 아래에 FormatTime 함수가 정의되어 있어 정상 작동합니다.
         if (timerTextP1 != null) timerTextP1.text = FormatTime(p1Timer);
         if (timerTextP2 != null) timerTextP2.text = FormatTime(p2Timer);
     }
@@ -165,22 +170,16 @@ public class GameManager : MonoBehaviour
         Debug.Log($"Game Over. Winner: {winner}");
     }
 
-    // ==========================================
-    // [추가된 함수들] 아래 함수들이 없어서 오류가 발생했었습니다.
-    // ==========================================
-
-    // 1. 메시지 업데이트 함수 (화면 중앙 텍스트 변경)
+    // 메시지 업데이트 함수
     void UpdateMessage(string msg)
     {
         if (messageText != null)
         {
             messageText.text = msg;
         }
-        // UI가 연결 안 되어 있을 때를 대비해 로그도 출력
-        // Debug.Log("[System Message] " + msg); 
     }
 
-    // 2. 시간 포맷팅 함수 (초 단위 float -> 분:초 string 변환)
+    // 시간 포맷팅 함수 (분:초)
     string FormatTime(float time)
     {
         if (time < 0) time = 0;
@@ -188,7 +187,6 @@ public class GameManager : MonoBehaviour
         float minutes = Mathf.FloorToInt(time / 60); // 분 계산
         float seconds = Mathf.FloorToInt(time % 60); // 초 계산
 
-        // string.Format을 사용하여 "00:00" 형태로 반환
         return string.Format("{0:00}:{1:00}", minutes, seconds);
     }
 }

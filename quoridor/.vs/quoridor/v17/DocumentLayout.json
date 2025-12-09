@@ -7,12 +7,12 @@
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\script\\PlayerMovement.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\nojh4\\quoridor\\Assets\\script\\player_movement.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\script\\player_movement.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\nojh4\\quoridor\\Assets\\script\\Gamemanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\script\\Gamemanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\nojh4\\quoridor\\Assets\\script\\player_movement.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\script\\player_movement.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -32,26 +32,27 @@
               "RelativeDocumentMoniker": "Assets\\script\\PlayerMovement.cs",
               "ToolTip": "C:\\Users\\nojh4\\quoridor\\Assets\\script\\PlayerMovement.cs",
               "RelativeToolTip": "Assets\\script\\PlayerMovement.cs",
-              "ViewState": "AgIAAAoCAAAAAAAAAAAUwIMAAAAOAAAAAAAAAA==",
+              "ViewState": "AgIAAPQAAAAAAAAAAADgvwQBAABCAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-12-04T13:37:49.061Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 1,
               "Title": "Gamemanager.cs",
               "DocumentMoniker": "C:\\Users\\nojh4\\quoridor\\Assets\\script\\GameManager.cs",
               "RelativeDocumentMoniker": "Assets\\script\\GameManager.cs",
               "ToolTip": "C:\\Users\\nojh4\\quoridor\\Assets\\script\\GameManager.cs",
               "RelativeToolTip": "Assets\\script\\GameManager.cs",
-              "ViewState": "AgIAALAAAAAAAAAAAAAAAMEAAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAJoAAAAAAAAAAAAAAMEAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-04T11:40:05.646Z"
+              "WhenOpened": "2025-12-04T11:40:05.646Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "player_movement.cs",
               "DocumentMoniker": "C:\\Users\\nojh4\\quoridor\\Assets\\script\\player_movement.cs",
               "RelativeDocumentMoniker": "Assets\\script\\player_movement.cs",

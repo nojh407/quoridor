@@ -1704,8 +1704,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerNumber: 1
-  initialTime: 300
-  currentTimer: 0
   moveDistance: 12
   moveSpeed: 30
   maxWalls: 10
@@ -1860,8 +1858,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerNumber: 2
-  initialTime: 300
-  currentTimer: 0
   moveDistance: 12
   moveSpeed: 30
   maxWalls: 10
@@ -3929,7 +3925,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4a25312689425b4f8bfa3029dfeb670, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  isPvpMode: 1
+  gameMode: 1
   player1: {fileID: 323509970}
   player2: {fileID: 326912099}
   currentTurn: 0
