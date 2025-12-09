@@ -5,143 +5,185 @@ using UnityEngine;
 public class PlayerMovement : MonoBehaviour
 {
     [Header("📝 Player Setup")]
-    // 1 또는 2로 설정 (1: WASD 이동, 2: 방향키 이동)
-    public int playerNumber = 1;
+    public int playerNumber = 1; // 1: WASD, 2: 방향키 (상하좌우 반전)
 
     [Header("⏳ Turn Management")]
-    // 모든 플레이어가 공유하는 현재 턴 변수 (1부터 시작)
     public static int currentTurn = 1;
-    // 게임 종료 상태 공유
     public static bool isGameOver = false;
+    public static int winner = 0; // 0: 진행중, 1: P1승리, 2: P2승리
+
+    [Header("⏰ Timer Settings")]
+    public float initialTime = 300f; // 초기 시간 5분 (300초)
+    public float currentTimer;       // 현재 남은 시간
 
     [Header("📏 Movement Settings")]
-    public float moveDistance = 12f; // 한 칸 이동 거리
+    public float moveDistance = 12f; // 한 칸 이동 거리 (타일 10 + 간격 2)
     public float moveSpeed = 20f;    // 이동 속도
 
     [Header("🧱 Wall Settings")]
-    public int maxWalls = 10;          // 최대 벽 개수
-    public int remainingWalls;         // 현재 남은 벽 개수 (게임 중 감소)
+    public int maxWalls = 10;
+    public int remainingWalls;
 
-    public GameObject wallPrefab;      // 실제로 설치될 벽 프리팹 (Collider 포함)
-    public GameObject ghostWall;       // 반투명 미리보기 벽 (Scene 오브젝트 또는 Prefab 연결)
-    public Material blueTransparent;   // 설치 가능할 때 재질
-    public Material redTransparent;    // 설치 불가능할 때 재질
-    public LayerMask obstacleLayer;    // 벽과 플레이어를 감지할 레이어
+    // 벽 사이즈 설정 (Scale 2, 4, 22 기준)
+    private float wallLength = 22f;
+    private float wallThickness = 2f;
+
+    public GameObject wallPrefab;      // 실제 벽 프리팹
+    public GameObject ghostWall;       // 유령 벽 프리팹
+    public Material blueTransparent;   // 설치 가능 재질
+    public Material redTransparent;    // 설치 불가 재질
+    public LayerMask obstacleLayer;    // 'Wall' 레이어
 
     [Header("🎨 Visual Stock Settings")]
-    // 벽 10개의 초기 위치를 직접 입력받는 배열 (플레이어마다 다르게 설정하세요!)
     public Vector3[] initialWallPositions;
-
-    // 벽 10개의 초기 회전값을 직접 입력받는 배열 (기본값: 90, 0, 0)
     public Vector3[] initialWallRotations;
 
-    // 생성된 재고 벽들을 관리하는 리스트 (FIFO 방식)
     private List<GameObject> stockWalls = new List<GameObject>();
 
     // --- 내부 변수들 ---
-    private Vector3 targetPosition;    // 플레이어 이동 목표 지점
-    private bool isWallMode = false;   // 벽 설치 모드 여부
-    private Renderer ghostRenderer;    // 유령 벽의 색상을 바꾸기 위한 렌더러
+    private Vector3 targetPosition;
+    private bool isWallMode = false;
+    private Renderer ghostRenderer;
 
     void Start()
     {
-        // 변수 초기화
         targetPosition = transform.position;
-        remainingWalls = maxWalls; // 벽 개수 10개로 초기화
+        remainingWalls = maxWalls;
 
-        // 게임 시작 시 1번 플레이어부터 시작하도록 초기화 (P1 스크립트에서만 수행)
+        // 타이머 초기화
+        currentTimer = initialTime;
+
+        // 게임 시작/재시작 시 초기화
         if (playerNumber == 1)
         {
             currentTurn = 1;
-            isGameOver = false; // 게임 재시작 시 상태 초기화
+            isGameOver = false;
+            winner = 0;
         }
 
-        // 🛠️ Ghost Wall 자동 생성 및 안전장치
+        // 🛠️ Ghost Wall 자동 설정
         if (ghostWall != null)
         {
-            // [핵심 수정] 할당된 ghostWall이 Prefab일 수 있으므로, 강제로 Scene에 생성(Instantiate)합니다.
-            GameObject ghostInstance = Instantiate(ghostWall);
-            ghostInstance.name = $"GhostWall_Player{playerNumber}"; // 이름 변경하여 찾기 쉽게 함
-            ghostWall = ghostInstance; // 변수가 이제 실제 Scene 객체를 가리키도록 갱신
+            if (ghostWall.scene.rootCount == 0)
+            {
+                GameObject ghostInstance = Instantiate(ghostWall);
+                ghostInstance.name = $"GhostWall_Player{playerNumber}";
+                ghostWall = ghostInstance;
+            }
 
-            // 렌더러 찾기 (자식 포함)
             ghostRenderer = ghostWall.GetComponentInChildren<Renderer>();
+            if (ghostRenderer != null) ghostRenderer.enabled = true;
 
-            if (ghostRenderer == null)
-            {
-                Debug.LogWarning($"⚠️ [Player {playerNumber}] Ghost Wall에 Renderer가 없습니다! 벽이 보이지 않을 수 있습니다.");
-            }
-            else
-            {
-                // 시작할 때 렌더러는 켜두되, 오브젝트를 끕니다.
-                ghostRenderer.enabled = true;
-            }
+            ghostWall.SetActive(false);
 
-            ghostWall.SetActive(false); // 처음엔 숨김
-
-            // [중요] 유령 벽이 스스로를 장애물로 인식하지 않도록 콜라이더 모두 제거
             Collider[] ghostCols = ghostWall.GetComponentsInChildren<Collider>();
-            foreach (var col in ghostCols)
-            {
-                Destroy(col);
-            }
-            Debug.Log($"🔧 [Player {playerNumber}] 유령 벽({ghostWall.name})이 생성되고 설정되었습니다.");
+            foreach (var col in ghostCols) Destroy(col);
         }
         else
         {
-            Debug.LogError($"❌ [Player {playerNumber}] 오류: Inspector창에서 Ghost Wall을 연결해주세요!");
+            Debug.LogError($"❌ [Player {playerNumber}] Ghost Wall이 연결되지 않았습니다!");
         }
 
-        // 🟢 초기 재고 벽 생성 (Visual Stock)
         SpawnStockWalls();
     }
 
     void Update()
     {
-        // 0. 게임 오버 체크: 게임이 끝나면 아무 동작도 하지 않음
         if (isGameOver) return;
 
-        // 1. 턴 체크: 내 차례가 아니면 아무 입력도 받지 않음
-        if (playerNumber != currentTurn)
+        // ⏰ 타이머 로직
+        if (playerNumber == currentTurn)
         {
-            MovePlayerSmoothly(); // 이동 애니메이션은 계속 수행
-            FixRotation();        // 회전 고정
+            currentTimer -= Time.deltaTime;
+
+            if (currentTimer <= 0)
+            {
+                currentTimer = 0;
+                isGameOver = true;
+                winner = (playerNumber == 1) ? 2 : 1; // 내 시간이 다 되면 상대방 승리
+                Debug.Log($"⏰ Time Over! Player {winner} WIN!");
+            }
+        }
+        else
+        {
+            MovePlayerSmoothly();
+            FixRotation();
             return;
         }
 
-        // 2. 모드 전환 (Tab 키)
-        if (Input.GetKeyDown(KeyCode.Tab))
-        {
-            ToggleMode();
-        }
+        if (Input.GetKeyDown(KeyCode.Tab)) ToggleMode();
 
-        // 3. 현재 모드에 따른 동작 실행
         if (isWallMode)
         {
             HandleWallMode();
-
-            // [디버깅] 유령 벽 위치 시각화 (Scene 뷰에서 빨간 선 확인 가능)
-            if (ghostWall != null)
-                Debug.DrawRay(ghostWall.transform.position, Vector3.up * 5, Color.red);
         }
         else
         {
             HandlePlayerMode();
         }
 
-        // 4. 공통 처리
         MovePlayerSmoothly();
         FixRotation();
     }
 
+    // =========================================================
+    // 🖥️ UI 표시 (OnGUI) - 별도 설정 없이 화면에 그리기
+    // =========================================================
+    void OnGUI()
+    {
+        // 폰트 스타일 설정
+        GUIStyle style = new GUIStyle(GUI.skin.label);
+        style.fontSize = 25;
+        style.fontStyle = FontStyle.Bold;
+
+        // 시간 포맷 (00:00)
+        string timeStr = string.Format("{0:00}:{1:00}", Mathf.FloorToInt(currentTimer / 60), Mathf.FloorToInt(currentTimer % 60));
+        string infoText = $"Player {playerNumber}\n⏳ {timeStr}\n🧱 Walls: {remainingWalls}";
+
+        // 플레이어별 위치 및 색상 설정
+        if (playerNumber == 1)
+        {
+            style.normal.textColor = Color.white; // 플레이어 1 정보 하얀색
+            GUI.Label(new Rect(30, 30, 300, 100), infoText, style);
+        }
+        else if (playerNumber == 2)
+        {
+            style.normal.textColor = Color.white; // 플레이어 2 정보 하얀색
+            // 화면 오른쪽 정렬
+            GUI.Label(new Rect(Screen.width - 200, 30, 300, 100), infoText, style);
+        }
+
+        // 중앙 상태 표시 (Player 1이 대표로 그림) - 기존 색상 유지
+        if (playerNumber == 1)
+        {
+            GUIStyle centerStyle = new GUIStyle(GUI.skin.label);
+            centerStyle.fontSize = 40;
+            centerStyle.fontStyle = FontStyle.Bold;
+            centerStyle.alignment = TextAnchor.UpperCenter;
+            centerStyle.normal.textColor = Color.black;
+
+            string centerText = "";
+            if (isGameOver)
+            {
+                centerStyle.normal.textColor = (winner == 1) ? Color.blue : Color.red;
+                centerText = $"🏆 Player {winner} WIN! 🏆";
+            }
+            else
+            {
+                centerText = $"Turn: Player {currentTurn}";
+            }
+
+            GUI.Label(new Rect(Screen.width / 2 - 200, 30, 400, 100), centerText, centerStyle);
+        }
+    }
+
     void FixRotation()
     {
-        // 플레이어 넘어짐 방지 (항상 서 있도록)
         transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
     }
 
     // =========================================================
-    // 🧱 시각적 재고 벽(Visual Stock) 관리
+    // 🧱 재고 벽 관리
     // =========================================================
     void SpawnStockWalls()
     {
@@ -152,18 +194,14 @@ public class PlayerMovement : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             Vector3 spawnPos = initialWallPositions[i];
-
-            // 회전값 설정 (기본값: 90, 0, 0)
             Vector3 spawnRotEuler = new Vector3(90, 0, 0);
+
             if (initialWallRotations != null && i < initialWallRotations.Length)
             {
                 spawnRotEuler = initialWallRotations[i];
             }
 
-            // 벽 생성
             GameObject stockObj = Instantiate(wallPrefab, spawnPos, Quaternion.Euler(spawnRotEuler));
-
-            // 재고 벽의 콜라이더 끄기 (설치 시 장애물로 인식되지 않게)
             Collider[] cols = stockObj.GetComponentsInChildren<Collider>();
             foreach (var c in cols) c.enabled = false;
 
@@ -173,17 +211,16 @@ public class PlayerMovement : MonoBehaviour
 
     void RemoveOneStockWall()
     {
-        // FIFO: 가장 앞에 있는(0번) 벽부터 사용 및 제거
         if (stockWalls.Count > 0)
         {
             GameObject wallToRemove = stockWalls[0];
-            stockWalls.RemoveAt(0); // 리스트에서 제거 -> 다음 벽이 0번이 됨
-            Destroy(wallToRemove);  // 화면에서 제거
+            stockWalls.RemoveAt(0);
+            Destroy(wallToRemove);
         }
     }
 
     // =========================================================
-    // 🎮 모드 전환 로직
+    // 🎮 모드 전환
     // =========================================================
     void ToggleMode()
     {
@@ -191,28 +228,19 @@ public class PlayerMovement : MonoBehaviour
 
         if (!isWallMode)
         {
-            // 벽 모드로 진입
-            if (remainingWalls <= 0)
-            {
-                Debug.Log($"🚫 [Player {playerNumber}] 남은 벽이 없습니다!");
-                return;
-            }
+            if (remainingWalls <= 0) return;
 
             isWallMode = true;
             ghostWall.SetActive(true);
-            if (ghostRenderer != null) ghostRenderer.enabled = true; // 렌더러 강제 활성화
+            if (ghostRenderer != null) ghostRenderer.enabled = true;
 
-            // ⭐️ 핵심 로직: 현재 사용 가능한 첫 번째 재고 벽(stockWalls[0]) 위치로 이동
             if (stockWalls.Count > 0)
             {
                 ghostWall.transform.position = stockWalls[0].transform.position;
                 ghostWall.transform.rotation = stockWalls[0].transform.rotation;
-
-                Debug.Log($"🧱 [Player {playerNumber}] 벽 모드 시작! (위치: {ghostWall.transform.position})");
             }
             else
             {
-                // 안전장치: 재고가 없다면 플레이어 위치에서 시작
                 ghostWall.transform.position = new Vector3(Mathf.Round(transform.position.x), 0, Mathf.Round(transform.position.z));
                 ghostWall.transform.rotation = Quaternion.Euler(90, 0, 0);
             }
@@ -221,15 +249,13 @@ public class PlayerMovement : MonoBehaviour
         }
         else
         {
-            // 이동 모드로 복귀
             isWallMode = false;
             ghostWall.SetActive(false);
-            Debug.Log($"🏃 [Player {playerNumber}] 플레이어 이동 모드 복귀");
         }
     }
 
     // =========================================================
-    // 🏃 플레이어 이동 로직
+    // 🏃 플레이어 이동
     // =========================================================
     void HandlePlayerMode()
     {
@@ -240,61 +266,89 @@ public class PlayerMovement : MonoBehaviour
 
             if (inputDir != Vector3.zero)
             {
-                // 🛑 이동 제한 로직 (맵 경계 및 승리 조건 체크)
-                Vector3 nextPos = targetPosition + (inputDir * moveDistance);
+                if (TryDiagonalJump(inputDir)) return;
 
-                // 1. X축 범위 체크 (-48 ~ 48)
-                if (nextPos.x < -48f || nextPos.x > 48f)
+                if (Physics.Raycast(transform.position, inputDir, out RaycastHit hit, moveDistance, obstacleLayer))
                 {
-                    Debug.Log("🚫 맵 밖으로 나갈 수 없습니다 (좌우 경계).");
-                    return;
-                }
+                    PlayerMovement otherPlayer = hit.collider.GetComponent<PlayerMovement>();
 
-                // 2. Z축 범위 체크 (-48 ~ 48) - 시작 지점 뒤로 나가는 것 방지
-                // 승리 지점(48 또는 -48)에 도달하는 것은 허용해야 하므로 <=, >= 사용
-                if (nextPos.z < -48f || nextPos.z > 48f)
-                {
-                    // 여기서 '승리'가 아닌 '맵 이탈'인 경우를 막아야 함.
-                    // P1(승리목표 +48)이 -60으로 가려하거나, P2(승리목표 -48)가 +60으로 가려할 때 차단
-                    // 사실상 -48 ~ 48 사이라면 유효한 보드 위임.
-                    // 승리 판단은 이동 확정 후(아래)에서 처리
-                    Debug.Log("🚫 맵 밖으로 나갈 수 없습니다 (상하 경계).");
-                    return;
-                }
-
-                // 이동 경로에 벽이 있는지 감지 (Raycast)
-                if (!Physics.Raycast(transform.position, inputDir, moveDistance, obstacleLayer))
-                {
-                    targetPosition += inputDir * moveDistance; // 이동 확정
-
-                    // 🏆 승리 조건 체크
-                    CheckWinCondition();
-
-                    if (!isGameOver)
+                    if (otherPlayer != null)
                     {
-                        EndTurn(); // 게임이 안 끝났으면 턴 넘기기
+                        if (!Physics.Raycast(otherPlayer.transform.position, inputDir, moveDistance, obstacleLayer))
+                        {
+                            Vector3 jumpPos = transform.position + (inputDir * moveDistance * 2);
+                            if (IsValidMapPosition(jumpPos))
+                            {
+                                targetPosition = jumpPos;
+                                CheckWinCondition();
+                                if (!isGameOver) EndTurn();
+                            }
+                        }
                     }
                 }
                 else
                 {
-                    Debug.Log($"[P{playerNumber}] 앞에 벽이 있어 이동할 수 없습니다.");
+                    Vector3 nextPos = transform.position + (inputDir * moveDistance);
+                    if (IsValidMapPosition(nextPos))
+                    {
+                        targetPosition = nextPos;
+                        CheckWinCondition();
+                        if (!isGameOver) EndTurn();
+                    }
                 }
             }
         }
     }
 
+    bool TryDiagonalJump(Vector3 inputDir)
+    {
+        Vector3[] dirs = { Vector3.forward, Vector3.back, Vector3.left, Vector3.right };
+
+        foreach (Vector3 neighborDir in dirs)
+        {
+            if (Mathf.Abs(Vector3.Dot(inputDir.normalized, neighborDir.normalized)) > 0.1f) continue;
+
+            if (Physics.Raycast(transform.position, neighborDir, out RaycastHit hit, moveDistance, obstacleLayer))
+            {
+                PlayerMovement otherPlayer = hit.collider.GetComponent<PlayerMovement>();
+                if (otherPlayer == null) continue;
+
+                if (Physics.Raycast(otherPlayer.transform.position, neighborDir, moveDistance, obstacleLayer))
+                {
+                    if (!Physics.Raycast(otherPlayer.transform.position, inputDir, moveDistance, obstacleLayer))
+                    {
+                        Vector3 diagTarget = otherPlayer.transform.position + (inputDir * moveDistance);
+                        if (IsValidMapPosition(diagTarget))
+                        {
+                            targetPosition = diagTarget;
+                            CheckWinCondition();
+                            if (!isGameOver) EndTurn();
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    bool IsValidMapPosition(Vector3 pos)
+    {
+        if (pos.x < -48f || pos.x > 48f) return false;
+        if (pos.z < -48f || pos.z > 48f) return false;
+        return true;
+    }
+
     void CheckWinCondition()
     {
-        // 플레이어 1: Z >= 48 이면 승리
         if (playerNumber == 1 && targetPosition.z >= 48f)
         {
-            Debug.Log("🏆 Player 1 WIN! 게임 종료!");
+            winner = 1;
             isGameOver = true;
         }
-        // 플레이어 2: Z <= -48 이면 승리
         else if (playerNumber == 2 && targetPosition.z <= -48f)
         {
-            Debug.Log("🏆 Player 2 WIN! 게임 종료!");
+            winner = 2;
             isGameOver = true;
         }
     }
@@ -316,22 +370,19 @@ public class PlayerMovement : MonoBehaviour
         if (inputDir != Vector3.zero)
         {
             float currentY = ghostWall.transform.eulerAngles.y;
-            // 90도 근처면 가로, 아니면 세로 (오차 범위 5도)
             bool isRotated90 = Mathf.Abs(Mathf.DeltaAngle(currentY, 90)) < 5f;
 
             bool shouldMove = false;
 
-            // 상하 입력 (Z축)
             if (inputDir.z != 0)
             {
-                if (isRotated90) ghostWall.transform.rotation = Quaternion.Euler(90, 0, 0); // 세로로 회전
-                else shouldMove = true; // 이동
+                if (isRotated90) ghostWall.transform.rotation = Quaternion.Euler(90, 0, 0);
+                else shouldMove = true;
             }
-            // 좌우 입력 (X축)
             else if (inputDir.x != 0)
             {
-                if (!isRotated90) ghostWall.transform.rotation = Quaternion.Euler(90, 90, 0); // 가로로 회전
-                else shouldMove = true; // 이동
+                if (!isRotated90) ghostWall.transform.rotation = Quaternion.Euler(90, 90, 0);
+                else shouldMove = true;
             }
 
             if (shouldMove)
@@ -342,100 +393,151 @@ public class PlayerMovement : MonoBehaviour
             UpdateGhostWallColor();
         }
 
-        // 스페이스바: 설치 확정
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            if (IsValidPosition())
-            {
-                PlaceWall();
-            }
-            else
-            {
-                Debug.Log($"🚫 [Player {playerNumber}] 설치 불가: 위치가 겹칩니다.");
-            }
+            if (IsValidPosition()) PlaceWall();
         }
     }
 
     void UpdateGhostWallColor()
     {
         if (ghostRenderer == null) return;
-        ghostRenderer.material = IsValidPosition() ? blueTransparent : redTransparent;
+        bool physicallyValid = IsValidPosition();
+        bool pathValid = physicallyValid && !DoesWallBlockPath();
+        ghostRenderer.material = (physicallyValid && pathValid) ? blueTransparent : redTransparent;
     }
 
     bool IsValidPosition()
     {
-        Vector3 checkSize = new Vector3(moveDistance * 0.9f, 0.5f, 0.5f);
-        Collider[] hitColliders = Physics.OverlapBox(
-            ghostWall.transform.position,
-            checkSize / 2,
-            ghostWall.transform.rotation,
-            obstacleLayer
-        );
+        Vector3 checkSize = new Vector3(wallThickness * 0.7f, 3f, wallLength * 0.85f);
+        Collider[] hitColliders = Physics.OverlapBox(ghostWall.transform.position, checkSize / 2, ghostWall.transform.rotation, obstacleLayer);
 
-        // 유령 벽 자신이나 재고 벽은 장애물로 치지 않음
         foreach (Collider col in hitColliders)
         {
             if (col.gameObject == ghostWall) continue;
+            if (col.transform.root.gameObject == ghostWall) continue;
             if (stockWalls.Contains(col.gameObject)) continue;
             return false;
         }
-
         return true;
+    }
+
+    bool DoesWallBlockPath()
+    {
+        BoxCollider tempCol = ghostWall.AddComponent<BoxCollider>();
+        Physics.SyncTransforms();
+
+        bool isBlocked = false;
+        PlayerMovement[] allPlayers = FindObjectsOfType<PlayerMovement>();
+
+        foreach (var p in allPlayers)
+        {
+            if (!HasPathToGoal(p))
+            {
+                isBlocked = true;
+                break;
+            }
+        }
+        DestroyImmediate(tempCol);
+        return isBlocked;
     }
 
     void PlaceWall()
     {
         if (remainingWalls > 0)
         {
-            // 실제 벽 생성
-            Instantiate(wallPrefab, ghostWall.transform.position, ghostWall.transform.rotation);
+            if (DoesWallBlockPath()) return;
+
+            GameObject newWall = Instantiate(wallPrefab, ghostWall.transform.position, ghostWall.transform.rotation);
+            int layerId = LayerMask.NameToLayer("Wall");
+            if (layerId != -1)
+            {
+                newWall.layer = layerId;
+                foreach (Transform t in newWall.transform) t.gameObject.layer = layerId;
+            }
+
             remainingWalls--;
-
-            // 사용한 재고 벽(현재 0번) 제거 -> 다음 벽이 0번이 됨
             RemoveOneStockWall();
-
-            Debug.Log($"✅ [Player {playerNumber}] 벽 설치 완료! (남은 벽: {remainingWalls}개)");
-
             isWallMode = false;
             ghostWall.SetActive(false);
             EndTurn();
         }
     }
 
-    // =========================================================
-    // 🛠 유틸리티 함수 (입력 방향 - Player 2 반전 처리 포함)
-    // =========================================================
+    bool HasPathToGoal(PlayerMovement p)
+    {
+        Vector2Int start = new Vector2Int(Mathf.RoundToInt(p.transform.position.x), Mathf.RoundToInt(p.transform.position.z));
+        Queue<Vector2Int> queue = new Queue<Vector2Int>();
+        HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
+
+        queue.Enqueue(start);
+        visited.Add(start);
+
+        Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+
+        while (queue.Count > 0)
+        {
+            Vector2Int current = queue.Dequeue();
+
+            if (p.playerNumber == 1 && current.y >= 48) return true;
+            if (p.playerNumber == 2 && current.y <= -48) return true;
+
+            foreach (var d in directions)
+            {
+                Vector2Int neighbor = current + (d * (int)moveDistance);
+
+                if (neighbor.x < -48 || neighbor.x > 48 || neighbor.y < -48 || neighbor.y > 48) continue;
+                if (visited.Contains(neighbor)) continue;
+
+                Vector3 currentWorld = new Vector3(current.x, 0, current.y);
+                Vector3 dirWorld = Vector3.zero;
+                if (d == Vector2Int.up) dirWorld = Vector3.forward;
+                if (d == Vector2Int.down) dirWorld = Vector3.back;
+                if (d == Vector2Int.left) dirWorld = Vector3.left;
+                if (d == Vector2Int.right) dirWorld = Vector3.right;
+
+                bool blocked = false;
+                RaycastHit[] hits = Physics.RaycastAll(currentWorld, dirWorld, moveDistance, obstacleLayer);
+                foreach (var hit in hits)
+                {
+                    if (hit.collider.GetComponent<PlayerMovement>() != null) continue;
+                    blocked = true;
+                    break;
+                }
+
+                if (!blocked)
+                {
+                    visited.Add(neighbor);
+                    queue.Enqueue(neighbor);
+                }
+            }
+        }
+        return false;
+    }
+
     Vector3 GetInputDirection()
     {
         Vector3 dir = Vector3.zero;
 
-        // Player 1: WASD (정방향)
-        if (playerNumber == 1)
+        if (playerNumber == 1) // WASD
         {
             if (Input.GetKeyDown(KeyCode.W)) dir = Vector3.forward;
             else if (Input.GetKeyDown(KeyCode.S)) dir = Vector3.back;
             else if (Input.GetKeyDown(KeyCode.A)) dir = Vector3.left;
             else if (Input.GetKeyDown(KeyCode.D)) dir = Vector3.right;
         }
-        // Player 2: 화살표 (마주 보는 시점이므로 반대 방향 처리)
-        else if (playerNumber == 2)
+        else if (playerNumber == 2) // 화살표
         {
-            // Up 키 -> 월드 좌표 Back (내 기준 전진)
             if (Input.GetKeyDown(KeyCode.UpArrow)) dir = Vector3.back;
-            // Down 키 -> 월드 좌표 Forward (내 기준 후퇴)
             else if (Input.GetKeyDown(KeyCode.DownArrow)) dir = Vector3.forward;
-            // Left 키 -> 월드 좌표 Right (내 기준 왼쪽)
             else if (Input.GetKeyDown(KeyCode.LeftArrow)) dir = Vector3.right;
-            // Right 키 -> 월드 좌표 Left (내 기준 오른쪽)
             else if (Input.GetKeyDown(KeyCode.RightArrow)) dir = Vector3.left;
         }
-
         return dir;
     }
 
     void EndTurn()
     {
         currentTurn = (currentTurn == 1) ? 2 : 1;
-        Debug.Log($"🔄 턴 변경! 현재 턴: Player {currentTurn}");
     }
 }
